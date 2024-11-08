@@ -1,0 +1,35 @@
+name: Release Helm Charts
+
+on:
+  push:
+    branches:
+      - master
+
+concurrency:
+  group: helm_charts_releases
+
+jobs:
+  release-helm-charts:
+    permissions:
+      contents: read
+      packages: write
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Release all platform Helm charts
+        shell: bash
+        run: ./platform/scripts/release-helm-charts.sh
+        env:
+          OCI_REGISTRY_URL: ghcr.io
+          OCI_REGISTRY_NAMESPACE: ${{ github.actor }}

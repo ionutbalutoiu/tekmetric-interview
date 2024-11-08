@@ -1,0 +1,16 @@
+{{- if .Values.pdb.enabled }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "tekmetric-app.fullname" . }}-pdb
+  labels:
+    {{- include "tekmetric-app.labels" . | nindent 4 }}
+spec:
+  maxUnavailable: {{ .Values.pdb.maxUnavailable | default 1 }}
+  {{- with .Values.pdb.minAvailable }}
+  minAvailable: {{ . }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "tekmetric-app.selectorLabels" . | nindent 6 }}
+{{- end }}

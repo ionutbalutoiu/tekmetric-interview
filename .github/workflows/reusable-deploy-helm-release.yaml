@@ -1,0 +1,67 @@
+name: Reusable - Deploy Helm release
+
+on:
+  workflow_call:
+    secrets:
+      kubeconfig_base64:
+        description: "Kubeconfig file content (base64-encoded)"
+        required: true
+
+    inputs:
+      kubernetes_namespace:
+        required: true
+        type: string
+        description: "Kubernetes namespace"
+
+      release_name:
+        required: true
+        type: string
+        description: "Helm release name"
+
+      helm_opts:
+        required: false
+        type: string
+        description: "Helm options"
+
+      local_chart_path:
+        required: false
+        type: string
+        description: "Local path to Helm chart"
+
+      oci_chart:
+        required: false
+        type: string
+        description: "Helm chart from OCI registry"
+
+      oci_chart_version:
+        required: false
+        type: string
+        description: "Helm chart version (required if oci_chart is set)"
+
+jobs:
+  helm-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup KUBECONFIG
+        shell: bash
+        run: |
+          set -e
+          mkdir -p ${HOME}/.kube
+          touch ${HOME}/.kube/config
+          chmod 600 ${HOME}/.kube/config
+          echo "${{ secrets.KUBECONFIG_BASE64 }}" | base64 -d > ${HOME}/.kube/config
+
+      - name: Deploy Helm release
+        shell: bash
+        run: ./platform/scripts/deploy-helm-release.sh
+        env:
+          HELM_NAMESPACE: ${{ inputs.kubernetes_namespace }}
+          HELM_RELEASE_NAME: ${{ inputs.release_name }}
+          HELM_OPTS: ${{ inputs.helm_opts }}
+          LOCAL_CHART_PATH: ${{ inputs.local_chart_path }}
+          HELM_OCI_CHART: ${{ inputs.oci_chart }}
+          HELM_OCI_CHART_VERSION: ${{ inputs.oci_chart_version }}

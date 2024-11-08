@@ -1,0 +1,98 @@
+name: Reusable - Build and Push Container Image
+
+on:
+  workflow_call:
+    secrets:
+      registry_user_password:
+        description: "Container registry user password"
+        required: true
+
+    inputs:
+      registry:
+        required: true
+        type: string
+        description: "Container registry URL"
+
+      registry_user_name:
+        required: true
+        type: string
+        description: "Container registry user name"
+
+      image:
+        required: true
+        type: string
+        description: "Container image name"
+
+      # NOTE: Documented at: https://github.com/docker/metadata-action?tab=readme-ov-file#tags-input
+      tags:
+        required: true
+        type: string
+        description: "Container image tags (the format is the same as 'tags' input from 'docker/metadata-action')"
+
+      platforms:
+        required: true
+        type: string
+        description: "List (given as comma-delimited string) of target platforms for the container image"
+
+      context:
+        required: true
+        type: string
+        description: "Context path for Docker buildx"
+
+      file:
+        required: false
+        type: string
+        description: "Dockerfile path. It defaults to: ${context}/Dockerfile"
+
+      build_args:
+        required: false
+        type: string
+        description: "Build arguments for Docker buildx"
+
+    outputs:
+      tags:
+        description: "Container image tags"
+        value: ${{ jobs.docker-buildx.outputs.tags }}
+
+jobs:
+  docker-buildx:
+    runs-on: ubuntu-latest
+
+    outputs:
+      tags: ${{ steps.meta.outputs.tags }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ inputs.registry }}
+          username: ${{ inputs.registry_user_name }}
+          password: ${{ secrets.registry_user_password }}
+
+      - name: Docker meta
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ inputs.registry }}/${{ inputs.image }}
+          tags: ${{ inputs.tags }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          platforms: ${{ inputs.platforms }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          context: ${{ inputs.context }}
+          file: ${{ inputs.file }}
+          build-args: ${{ inputs.build_args }}
+          pull: true
+          push: true

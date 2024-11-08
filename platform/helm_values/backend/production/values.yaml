@@ -1,0 +1,122 @@
+nameOverride: backend-production
+
+image:
+  repository: ghcr.io/ionutbalutoiu/tekmetric-interview-backend
+
+configMaps:
+  env_vars:
+    name: &envVarsCM "{{ .Release.Name }}-env-vars"
+    data:
+      ENV: production
+      TEST_VAR: production-test-value
+      SERVER_PORT: &portNumber "8095"
+  config_files:
+    name: &configFilesCM "{{ .Release.Name }}-config-files"
+    data:
+      sample-config.yaml: |-
+        app:
+          name: Production Tekmetric Interview Backend
+          environment: production
+
+app:
+  envFrom:
+    - source: configMap
+      name: *envVarsCM
+    - source: secret
+      name: "{{ .Release.Name }}-secrets"
+
+  ports:
+    - name: &portName http
+      number: *portNumber
+
+  healthCheck:
+    readinessProbe:
+      httpGet:
+        path: /api/health_check
+        port: *portName
+    livenessProbe:
+      httpGet:
+        path: /api/ping
+        port: *portName
+
+  volumes:
+    - name: config-files
+      configMap:
+        name: *configFilesCM
+    - name: ssh-keys
+      secret:
+        secretName: "{{ .Release.Name }}-ssh-keys"
+
+  volumeMounts:
+    - name: config-files
+      mountPath: /etc/config
+      readOnly: true
+    - name: ssh-keys
+      mountPath: /etc/ssh
+      readOnly: true
+
+service:
+  targetPort: *portName
+
+serviceMonitor:
+  enabled: true
+  labels:
+    release: kube-prometheus
+  port: *portName
+  path: /actuator/prometheus
+
+ingress:
+  enabled: true
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+    traefik.ingress.kubernetes.io/router.tls: "true"
+    traefik.ingress.kubernetes.io/router.tls.certresolver: le
+  hosts:
+    - host: tekmetric-interview-backend-production.balutoiu.com
+      paths:
+        - path: /
+          pathType: Exact
+        - path: /api
+          pathType: Prefix
+
+pdb:
+  enabled: true
+  maxUnavailable: 1
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 80
+
+affinity:
+  nodeAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: node-pool
+              operator: In
+              values:
+                - k3s-workers
+  # NOTE: This ensures that app pods are spread across different Kubernetes workers in the cluster.
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - labelSelector:
+          matchExpressions:
+            - key: app.kubernetes.io/instance
+              operator: In
+              values:
+                - backend-production
+        topologyKey: kubernetes.io/hostname
+
+tolerations:
+  - key: spring-boot-apps
+    operator: Exists
+    effect: NoSchedule
+
+resources:
+  requests:
+    cpu: 0.1
+    memory: 512Mi
+  limits:
+    memory: 4Gi

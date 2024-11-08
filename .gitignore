@@ -1,7 +1,10 @@
 frontend/node_modules
+backend/.vscode/*
 backend/.idea/*
 backend/*.iml
 backend/target/**
+platform/charts/**/charts
+platform/charts/**/*.tgz
 
 # ignoring the .idea folder
 .idea

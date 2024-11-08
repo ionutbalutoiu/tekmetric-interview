@@ -1,0 +1,93 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tekmetric-app.fullname" . }}
+  labels:
+    {{- include "tekmetric-app.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "tekmetric-app.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "tekmetric-app.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "tekmetric-app.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.app.command }}
+          command:
+            {{ .Values.app.command | nindent 12 }}
+          {{- end }}
+          {{- if .Values.app.args }}
+          args:
+            {{ .Values.app.args | nindent 12 }}
+          {{- end }}
+          envFrom:
+          {{- range .Values.app.envFrom }}
+          {{- if eq (lower .source) "configmap" }}
+            - configMapRef:
+                name: {{ tpl .name $ }}
+          {{- end }}
+          {{- if eq (lower .source) "secret" }}
+            - secretRef:
+                name: {{ tpl .name $ }}
+          {{- end }}
+          {{- end }}
+          ports:
+          {{- range .Values.app.ports }}
+            - name: {{ .name }}
+              containerPort: {{ .number }}
+              protocol: {{ .protocol | default "TCP" }}
+          {{- end }}
+          {{- if .Values.app.healthCheck.livenessProbe.enabled }}
+          livenessProbe:
+            {{- toYaml .Values.app.healthCheck.livenessProbe.spec | nindent 12 }}
+          {{- end }}
+          {{- if .Values.app.healthCheck.readinessProbe.enabled }}
+          readinessProbe:
+            {{- toYaml .Values.app.healthCheck.readinessProbe.spec | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- with .Values.app.volumeMounts }}
+          volumeMounts:
+            {{- tpl (toYaml .) $ | nindent 12 }}
+          {{- end }}
+      {{- with .Values.app.volumes }}
+      volumes:
+        {{- tpl (toYaml .) $ | nindent 8 }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
