@@ -1,0 +1,33 @@
+name: Staging Deployment
+
+on:
+  push:
+    branches:
+      - master
+
+jobs:
+  backend-build:
+    uses: ./.github/workflows/build-push-image.yaml
+    secrets:
+      registry_user_password: ${{ secrets.GITHUB_TOKEN }}
+    with:
+      registry: ghcr.io
+      registry_user_name: ${{ github.actor }}
+      image: ionutbalutoiu/tekmetric-interview-backend
+      tags: |
+        latest
+        ${{ github.ref_name }}-${{ github.sha }}
+      platforms: linux/amd64
+      context: ./backend
+
+  backend-deploy:
+    needs: backend-build
+    uses: ./.github/workflows/deploy-helm-release.yaml
+    secrets:
+      kubeconfig_base64: ${{ secrets.STAGING_KUBECONFIG_BASE64 }}
+    with:
+      helm_opts: "--atomic --wait --set image.tag=${{ github.ref_name }}-${{ github.sha }}"
+      kubernetes_namespace: backend-staging
+      release_name: backend-staging
+      values_file: ./platform/helm_values/backend/staging/values.yaml
+      local_chart_path: ./platform/charts/tekmetric-app

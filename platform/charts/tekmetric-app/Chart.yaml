@@ -1,0 +1,5 @@
+apiVersion: v2
+name: tekmetric-app
+description: A Helm chart to deploy the Tekmetric apps
+type: application
+version: 0.1.0

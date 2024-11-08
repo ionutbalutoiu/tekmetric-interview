@@ -1,0 +1,24 @@
+name: Production Deployment
+
+on:
+  release:
+    types:
+      - released
+
+jobs:
+  backend-build-container-image:
+    uses: ./.github/workflows/build-push-image.yaml
+    secrets:
+      registry_user_password: ${{ secrets.GITHUB_TOKEN }}
+    with:
+      registry: ghcr.io
+      registry_user_name: ${{ github.actor }}
+      image_name: ionutbalutoiu/tekmetric-interview-backend
+      image_tags: |
+        ${{ github.event.release.tag_name }}
+      platforms: linux/amd64
+      context: ./backend
+
+  # backend-deploy-k8s:
+  #   uses: ./.github/workflows/deploy-k8s.yaml
+  #   # TODO: Add the required inputs for the deploy-k8s action
