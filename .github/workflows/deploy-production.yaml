@@ -1,0 +1,40 @@
+name: Deploy Production
+
+on:
+  release:
+    types:
+      - released
+
+concurrency:
+  group: production_deployments
+
+jobs:
+  backend-build:
+    uses: ./.github/workflows/reusable-build-push-image.yaml
+    secrets:
+      registry_user_password: ${{ secrets.GITHUB_TOKEN }}
+    with:
+      registry: ghcr.io
+      registry_user_name: ${{ github.actor }}
+      image: ionutbalutoiu/tekmetric-interview-backend
+      tags: |
+        ${{ github.event.release.tag_name }}
+      platforms: linux/amd64
+      context: ./backend
+
+  backend-deploy:
+    needs: backend-build
+    uses: ./.github/workflows/reusable-deploy-helm-release.yaml
+    secrets:
+      kubeconfig_base64: ${{ secrets.PRODUCTION_KUBECONFIG_BASE64 }}
+    with:
+      kubernetes_namespace: backend-production
+      release_name: backend-production
+      oci_chart: oci://ghcr.io/ionutbalutoiu/chart-tekmetric-app
+      oci_chart_version: 1.0.0
+      helm_opts: >
+        --atomic
+        --wait
+        --set image.tag=${{ github.event.release.tag_name }}
+        -f ./platform/helm_values/backend/production/values.yaml
+        -f ./platform/helm_values/backend/production/secrets.yaml

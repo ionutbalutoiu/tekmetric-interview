@@ -1,0 +1,20 @@
+{{- $fullname := include "tekmetric-app.fullname" . }}
+
+{{- range $nameSuffix, $configmap := .Values.configMaps }}
+{{- if $configmap.data }}
+{{- $name := default (printf "%s-%s" $fullname $nameSuffix) $configmap.name }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ (tpl $name $) | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "tekmetric-app.labels" $ | nindent 4 }}
+  {{- with .annotations }}
+  annotations:
+    {{- . | nindent 4 }}
+  {{- end }}
+data:
+  {{- $configmap.data | toYaml | nindent 2 }}
+{{- end }}
+{{- end }}
